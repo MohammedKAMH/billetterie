@@ -1,8 +1,9 @@
-﻿using System;
+﻿using Billetterie.Domain.Entities;
+using Billetterie.Infrastructure.Data.Configurations;
+using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.Text;
-using Billetterie.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
 
 namespace Billetterie.Infrastructure.Data
 {
@@ -23,6 +24,7 @@ namespace Billetterie.Infrastructure.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(BilletterieDbContext).Assembly);
         }
 
 
