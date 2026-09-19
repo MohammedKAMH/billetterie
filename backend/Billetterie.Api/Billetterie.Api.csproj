@@ -20,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Billetterie.Domain\Billetterie.Domain.csproj" />
     <ProjectReference Include="..\Billetterie.Infrastructure\Billetterie.Infrastructure.csproj" />
+    <ProjectReference Include="..\Billetterie.Application\Billetterie.Application.csproj" />
   </ItemGroup>
 
 </Project>

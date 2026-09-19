@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Billetterie.Domain\Billetterie.Domain.csproj" />
+    <ProjectReference Include="..\Billetterie.Application\Billetterie.Application.csproj" />
   </ItemGroup>
 	
 

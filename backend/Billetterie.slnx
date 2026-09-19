@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="Billetterie.Api/Billetterie.Api.csproj" />
+  <Project Path="Billetterie.Application/Billetterie.Application.csproj" />
   <Project Path="Billetterie.Domain/Billetterie.Domain.csproj" />
   <Project Path="Billetterie.Infrastructure/Billetterie.Infrastructure.csproj" />
 </Solution>

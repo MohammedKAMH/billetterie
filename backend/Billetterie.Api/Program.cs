@@ -1,4 +1,8 @@
+using Billetterie.Api.Auth;
+using Billetterie.Application.Interfaces;
 using Billetterie.Infrastructure.Data;
+using Billetterie.Infrastructure.Services;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -24,6 +28,11 @@ builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+builder.Services.AddTransient<IClaimsTransformation, KeycloakRolesClaimsTransformation>();
+
+builder.Services.AddScoped<IUtilisateurService,UtilisateurService>();
+builder.Services.AddScoped<IEvenementService, EvenementService>();
 
 
 var app = builder.Build();
