@@ -58,5 +58,48 @@ namespace Billetterie.Api.Controllers
 
             return Created(string.Empty, new { evenement.Id, evenement.Titre, statut = evenement.Statut });
         }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetEvenementById (Guid id)
+        {
+            var evenement = await _evenementService.GetEvenementByIdAsync(id);
+            if(evenement is null || evenement.Statut != EvenementStatut.Publie)
+            {
+                return NotFound();
+            }
+
+            var dto = new EvenementDto
+            {
+                Id = evenement.Id,
+                Titre = evenement.Titre,
+                Description = evenement.Description,
+                Lieu = evenement.Lieu,
+                DateDebut = evenement.DateDebut,
+                DateFin = evenement.DateFin,
+                NomOrganisateur = $"{evenement.Organisateur.Utilisateur.Prenom} {evenement.Organisateur.Utilisateur.Nom}"
+            };
+
+            return Ok(dto);
+
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAllEvenements()
+        {
+            var evenements = await _evenementService.GetAllEvenementsAsync();
+            var dtos = evenements.Select(e => new EvenementDto
+            {
+                Id = e.Id,
+                Titre = e.Titre,
+                Description = e.Description,
+                Lieu = e.Lieu,
+                DateDebut = e.DateDebut,
+                DateFin = e.DateFin,
+                NomOrganisateur = $"{e.Organisateur.Utilisateur.Prenom} {e.Organisateur.Utilisateur.Nom}"
+            });
+            return Ok(dtos);
+        }
     }
+
+
 }

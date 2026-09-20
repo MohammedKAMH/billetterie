@@ -6,6 +6,10 @@ namespace Billetterie.Application.Interfaces
     public interface IEvenementService
     {
         Task AddEvenementAsync(Evenement evenement);
+        Task<Evenement?> GetEvenementByIdAsync(Guid id);
+        Task<IList<Evenement>> GetAllEvenementsAsync();
+
+
 
     }
 }
