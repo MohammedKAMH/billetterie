@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Billetterie.Application.DTOs
 {
-    public class CreationEvenement
+    public class CreationEvenementDto
     {
         public required string Titre { get; set; }
         public required string Description { get; set; }

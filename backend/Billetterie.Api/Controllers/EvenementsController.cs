@@ -22,7 +22,7 @@ namespace Billetterie.Api.Controllers
 
         [Authorize(Roles = "Organisateur")]
         [HttpPost]
-        public async Task<IActionResult> CreateEvenement(CreationEvenement evenementForm)
+        public async Task<IActionResult> CreateEvenement(CreationEvenementDto evenementForm)
         {
             var keycloakId = User.GetKeycloakId();
             if (keycloakId is null)
@@ -60,10 +60,10 @@ namespace Billetterie.Api.Controllers
         }
 
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetEvenementById (Guid id)
+        public async Task<IActionResult> GetEvenementById(Guid id)
         {
             var evenement = await _evenementService.GetEvenementByIdAsync(id);
-            if(evenement is null || evenement.Statut != EvenementStatut.Publie)
+            if (evenement is null)
             {
                 return NotFound();
             }
@@ -86,7 +86,7 @@ namespace Billetterie.Api.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAllEvenements()
         {
-            var evenements = await _evenementService.GetAllEvenementsAsync();
+            var evenements = await _evenementService.GetPublishedEvenementsAsync();
             var dtos = evenements.Select(e => new EvenementDto
             {
                 Id = e.Id,
@@ -98,6 +98,86 @@ namespace Billetterie.Api.Controllers
                 NomOrganisateur = $"{e.Organisateur.Utilisateur.Prenom} {e.Organisateur.Utilisateur.Nom}"
             });
             return Ok(dtos);
+        }
+
+        [Authorize(Roles = "Organisateur")]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateEvenement(Guid id, UpdateEvenementDto update)
+        {
+            var keycloakId = User.GetKeycloakId();
+            if (keycloakId is null)
+            {
+                return BadRequest("Token invalide");
+            }
+
+            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
+            if (utilisateur?.Organisateur is null)
+            {
+                return Forbid();
+            }
+
+            var evenement = await _evenementService.GetEvenementByIdAsync(id);
+            if (evenement is null)
+            {
+                return NotFound();
+            }
+
+            if (evenement.OrganisateurId != utilisateur.Organisateur.Id)
+            {
+                return Forbid();
+            }
+
+            evenement.Titre = update.Titre;
+            evenement.Description = update.Description;
+            evenement.Lieu = update.Lieu;
+            evenement.DateDebut = update.DateDebut;
+            evenement.DateFin = update.DateFin;
+
+            await _evenementService.UpdateEvenementAsync(evenement);
+
+            return Ok(new { evenement.Id, evenement.Titre, statut = evenement.Statut });
+        }
+
+        [Authorize(Roles = "Organisateur")]
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> AnnulerEvenementAsync(Guid id)
+        {
+            var keycloakId = User.GetKeycloakId();
+            if (keycloakId is null)
+            {
+                return BadRequest("Token invalide");
+            }
+
+            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
+
+            if (utilisateur?.Organisateur is null)
+            {
+                return Forbid();
+            }
+
+            if (utilisateur.Organisateur.StatutValidation != StatutValidation.Valide)
+            {
+                return Forbid();
+            }
+            var evenement = await _evenementService.GetEvenementByIdAsync(id);
+            if(evenement is null)
+            {
+                return NotFound();
+            }
+
+            if (evenement.OrganisateurId != utilisateur.Organisateur.Id)
+            {
+                return Forbid();
+            }
+
+            if (evenement.Statut is EvenementStatut.Annule or EvenementStatut.Termine)
+            {
+                return Conflict("Cet évènement ne peut plus être annulé.");
+            }
+
+            await _evenementService.AnnulerEvenementAsync(evenement);
+
+            return NoContent();
         }
     }
 
