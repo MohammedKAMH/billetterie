@@ -55,5 +55,12 @@ namespace Billetterie.Infrastructure.Services
             _context.Evenements.Update(evenement);
             await _context.SaveChangesAsync();
         }
+
+        public async Task PublierEvenementAsync(Evenement evenement)
+        {
+            evenement.Statut = EvenementStatut.Publie;
+            _context.Evenements.Update(evenement);
+            await _context.SaveChangesAsync();
+        }
     }
 }

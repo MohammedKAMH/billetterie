@@ -140,7 +140,7 @@ namespace Billetterie.Api.Controllers
 
         [Authorize(Roles = "Organisateur")]
         [HttpDelete("{id}")]
-        public async Task<IActionResult> AnnulerEvenementAsync(Guid id)
+        public async Task<IActionResult> AnnulerEvenement(Guid id)
         {
             var keycloakId = User.GetKeycloakId();
             if (keycloakId is null)
@@ -176,6 +176,48 @@ namespace Billetterie.Api.Controllers
             }
 
             await _evenementService.AnnulerEvenementAsync(evenement);
+
+            return NoContent();
+        }
+
+        [Authorize(Roles = "Organisateur")]
+        [HttpPost("{id}/publier")]
+        public async Task<IActionResult> PublierEvenement(Guid id)
+        {
+            var keycloakId = User.GetKeycloakId();
+            if (keycloakId is null)
+            {
+                return BadRequest("Token invalide");
+            }
+
+            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
+
+            if (utilisateur?.Organisateur is null)
+            {
+                return Forbid();
+            }
+
+            if (utilisateur.Organisateur.StatutValidation != StatutValidation.Valide)
+            {
+                return Forbid();
+            }
+            var evenement = await _evenementService.GetEvenementByIdAsync(id);
+            if (evenement is null)
+            {
+                return NotFound();
+            }
+
+            if (evenement.OrganisateurId != utilisateur.Organisateur.Id)
+            {
+                return Forbid();
+            }
+
+            if (evenement.Statut != EvenementStatut.Brouillon)
+            {
+                return Conflict("Cet évènement ne peut plus être publié.");
+            }
+
+            await _evenementService.PublierEvenementAsync(evenement);
 
             return NoContent();
         }

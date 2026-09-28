@@ -15,5 +15,6 @@ namespace Billetterie.Application.Interfaces
 
         Task UpdateEvenementAsync(Evenement evenement);
         Task AnnulerEvenementAsync(Evenement evenement);
+        Task PublierEvenementAsync(Evenement evenement);
     }
 }
