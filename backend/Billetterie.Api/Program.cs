@@ -11,7 +11,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddDbContext<BilletterieDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("BilletterieDb")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("BilletterieDb"))
+            .EnableSensitiveDataLogging());
 
 JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
@@ -33,7 +34,7 @@ builder.Services.AddTransient<IClaimsTransformation, KeycloakRolesClaimsTransfor
 
 builder.Services.AddScoped<IUtilisateurService,UtilisateurService>();
 builder.Services.AddScoped<IEvenementService, EvenementService>();
-
+builder.Services.AddScoped<ITypeBilletService, TypeBilletService>();
 
 var app = builder.Build();
 
