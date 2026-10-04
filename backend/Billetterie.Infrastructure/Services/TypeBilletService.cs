@@ -25,5 +25,22 @@ namespace Billetterie.Infrastructure.Services
                 .Where(t => t.EvenementId == evenementId)
                 .ToListAsync();
         }
+
+        public async Task<TypeBillet?> GetTypeBilletByIdAsync(Guid id)
+        {
+            return await _context.TypeBillets
+                .Include(t => t.Evenement)
+                .FirstOrDefaultAsync(t => t.Id == id);
+        }
+        public async Task UpdateTypeBilletAsync(TypeBillet typeBillet)
+        {
+            await _context.SaveChangesAsync();
+
+        }
+        public async Task DeleteTypeBilletAsync(TypeBillet typeBillet)
+        {
+            _context.TypeBillets.Remove(typeBillet);
+            await _context.SaveChangesAsync();
+        }
     }
 }

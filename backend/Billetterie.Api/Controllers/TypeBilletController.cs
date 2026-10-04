@@ -96,7 +96,105 @@ namespace Billetterie.Api.Controllers
                 
         }
 
+        [Authorize(Roles = "Organisateur")]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateTypeBillet(Guid evenementId, Guid id, UpdateTypeBilletDto updated)
+        {
+            var keycloakId = User.GetKeycloakId();
+            if (keycloakId is null)
+            {
+                return BadRequest("Token invalide");
+            }
 
+            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
+            if (utilisateur?.Organisateur is null)
+            {
+                return Forbid();
+            }
+
+            var evenement = await _evenementService.GetEvenementByIdAsync(evenementId);
+            if (evenement is null)
+            {
+                return NotFound();
+            }
+
+            if (evenement.OrganisateurId != utilisateur.Organisateur.Id)
+            {
+                return Forbid();
+            }
+
+            if (evenement.Statut is EvenementStatut.Annule or EvenementStatut.Termine)
+            {
+                return Conflict("Impossible de modifier un type de billet de cet évènement.");
+            }
+
+            var typeBillet = await _typeBilletService.GetTypeBilletByIdAsync(id);
+            if (typeBillet is null || typeBillet.EvenementId != evenementId)
+            {
+                return NotFound();
+            }
+
+            if (updated.QuantiteTotale < typeBillet.QuantiteVendue)
+            {
+                return Conflict("La quantité totale ne peut pas être inférieure au nombre de billets déjà vendus.");
+            }
+
+            if (typeBillet.QuantiteVendue > 0 && updated.Prix != typeBillet.Prix)
+            {
+                return Conflict("Le prix ne peut plus être modifié : des billets ont déjà été vendus.");
+            }
+
+            typeBillet.Nom = updated.Nom;
+            typeBillet.Prix = updated.Prix;
+            typeBillet.QuantiteTotale = updated.QuantiteTotale;
+
+            await _typeBilletService.UpdateTypeBilletAsync(typeBillet);
+
+            return Ok(new { typeBillet.Id, typeBillet.Nom, typeBillet.Prix, typeBillet.QuantiteTotale });
+        }
+
+        [Authorize(Roles = "Organisateur")]
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteTypeBillet(Guid evenementId, Guid id)
+        {
+            var keycloakId = User.GetKeycloakId();
+            if (keycloakId is null)
+            {
+                return BadRequest("Token invalide");
+            }
+
+            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
+            if (utilisateur?.Organisateur is null)
+            {
+                return Forbid();
+            }
+
+            var evenement = await _evenementService.GetEvenementByIdAsync(evenementId);
+            if (evenement is null)
+            {
+                return NotFound();
+            }
+
+            if (evenement.OrganisateurId != utilisateur.Organisateur.Id)
+            {
+                return Forbid();
+            }
+
+            var typeBillet = await _typeBilletService.GetTypeBilletByIdAsync(id);
+            if (typeBillet is null || typeBillet.EvenementId != evenementId)
+            {
+                return NotFound();
+            }
+
+            if (typeBillet.QuantiteVendue > 0)
+            {
+                return Conflict("Impossible de supprimer un type de billet dont des billets ont déjà été vendus.");
+            }
+
+            await _typeBilletService.DeleteTypeBilletAsync(typeBillet);
+
+            return NoContent();
+        }
 
 
     }
