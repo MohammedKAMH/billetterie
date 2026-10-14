@@ -33,7 +33,7 @@ namespace Billetterie.Infrastructure.Services
                 .FirstOrDefaultAsync(e => e.Id == id);
         }
 
-        public async Task<IList<Evenement>?> GetPublishedEvenementsAsync()
+        public async Task<IList<Evenement>> GetPublishedEvenementsAsync()
         {
             return await _context.Evenements
                 .Include(e => e.Organisateur)

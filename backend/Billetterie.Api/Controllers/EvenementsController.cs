@@ -13,11 +13,15 @@ namespace Billetterie.Api.Controllers
     {
         private readonly IEvenementService _evenementService;
         private readonly IUtilisateurService _utilisateurService;
+        public readonly ITypeBilletService _typeBilletService;
 
-        public EvenementsController(IEvenementService evenementService, IUtilisateurService utilisateurService)
+        public EvenementsController(IEvenementService evenementService,
+            IUtilisateurService utilisateurService,
+            ITypeBilletService typeBilletService)
         {
             _evenementService = evenementService;
             _utilisateurService = utilisateurService;
+            _typeBilletService = typeBilletService;
         }
 
         [Authorize(Roles = "Organisateur")]
@@ -215,6 +219,12 @@ namespace Billetterie.Api.Controllers
             if (evenement.Statut != EvenementStatut.Brouillon)
             {
                 return Conflict("Cet évènement ne peut plus être publié.");
+            }
+
+            var typebillets = await _typeBilletService.GetByEvenementAsync(evenement.Id);
+            if (typebillets.Count == 0)
+            {
+                return Conflict("Il faut au moins un type de billet pour publier cet évènement.");
             }
 
             await _evenementService.PublierEvenementAsync(evenement);

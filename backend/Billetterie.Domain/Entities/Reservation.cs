@@ -9,12 +9,14 @@ namespace Billetterie.Domain.Entities
         EnAttente,
         Paye,
         Annule,
+        Expire,
     }
     public class Reservation
     {
         public Guid Id { get; set;  }
         public Guid UtilisateurId { get; set; }
         public DateTime DateReservation { get; set; } = DateTime.UtcNow;
+        public DateTime DateExpiration { get; set; }
         public StatutPaiement StatutPaiement { get; set; } = StatutPaiement.EnAttente;
         public decimal MontantTotal { get; set; } = 0m;
 

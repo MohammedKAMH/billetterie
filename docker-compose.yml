@@ -2,7 +2,7 @@ services:
   db:
     image: postgres:16
     container_name: billetterie-db
-    restart: always
+    restart: "no"
     environment:
       POSTGRES_USER: ${BILLETTERIE_DB_USER}
       POSTGRES_PASSWORD: ${BILLETTERIE_DB_PASSWORD}
@@ -15,7 +15,7 @@ services:
   keycloak-db:
     image: postgres:16
     container_name: billetterie-keycloak-db
-    restart: always
+    restart: "no"
     environment:
       POSTGRES_USER: ${KEYCLOAK_DB_USER}
       POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
@@ -27,7 +27,7 @@ services:
     image: quay.io/keycloak/keycloak:26.0
     container_name: billetterie-keycloak
     command: start-dev
-    restart: always
+    restart: "no"
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak

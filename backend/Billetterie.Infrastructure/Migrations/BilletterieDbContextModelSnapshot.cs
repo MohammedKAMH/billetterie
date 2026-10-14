@@ -129,6 +129,9 @@ namespace Billetterie.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime>("DateExpiration")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("DateReservation")
                         .HasColumnType("timestamp with time zone");
 
@@ -145,6 +148,8 @@ namespace Billetterie.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("UtilisateurId");
+
+                    b.HasIndex("StatutPaiement", "DateExpiration");
 
                     b.ToTable("Reservations");
                 });
@@ -180,6 +185,8 @@ namespace Billetterie.Infrastructure.Migrations
                     b.ToTable("TypeBillets", t =>
                         {
                             t.HasCheckConstraint("CK_TypeBillet_QuantiteVendue", "\"QuantiteVendue\" <= \"QuantiteTotale\"");
+
+                            t.HasCheckConstraint("CK_TypeBillet_QuantiteVendue_Positive", "\"QuantiteVendue\" >= 0");
                         });
                 });
 

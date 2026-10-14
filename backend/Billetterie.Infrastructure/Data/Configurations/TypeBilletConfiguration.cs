@@ -18,6 +18,11 @@ namespace Billetterie.Infrastructure.Data.Configurations
             builder.ToTable(t => t.HasCheckConstraint(
                 "CK_TypeBillet_QuantiteVendue",
                 "\"QuantiteVendue\" <= \"QuantiteTotale\""));
+
+            builder.ToTable(t => t.HasCheckConstraint(
+               "CK_TypeBillet_QuantiteVendue_Positive",
+               "\"QuantiteVendue\" >= 0"));
+
         }
     }
 }

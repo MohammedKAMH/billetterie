@@ -29,12 +29,14 @@ builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddTransient<IClaimsTransformation, KeycloakRolesClaimsTransformation>();
 
 builder.Services.AddScoped<IUtilisateurService,UtilisateurService>();
 builder.Services.AddScoped<IEvenementService, EvenementService>();
-builder.Services.AddScoped<ITypeBilletService, TypeBilletService>();
+builder.Services.AddScoped<ITypeBilletService, TypeBilletService>(); 
+builder.Services.AddScoped<IReservationService, ReservationService>();
 
 var app = builder.Build();
 

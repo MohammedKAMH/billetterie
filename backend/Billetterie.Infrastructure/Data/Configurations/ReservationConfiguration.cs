@@ -10,6 +10,8 @@ namespace Billetterie.Infrastructure.Data.Configurations
         {
             builder.Property(r => r.MontantTotal)
                 .HasPrecision(10, 2);
+
+            builder.HasIndex(r => new { r.StatutPaiement, r.DateExpiration });
         }
     }
 }
