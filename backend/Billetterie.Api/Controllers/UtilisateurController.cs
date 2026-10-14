@@ -45,7 +45,7 @@ namespace Billetterie.Api.Controllers
 
                 await _utilisateurService.AddUtilisateurAsync(utilisateur); 
 
-                return Ok(new {utilisateur.Id, utilisateur.Email, status = "existant" });
+                return Ok(new {utilisateur.Id, utilisateur.Email, statut = "cree" });
             }
 
             utilisateur.Email = email;

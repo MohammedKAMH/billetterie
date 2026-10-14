@@ -1,9 +1,9 @@
-﻿using Billetterie.Api.Extensions;
+﻿using Billetterie.Api.Auth;
 using Billetterie.Application.DTOs;
 using Billetterie.Application.Interfaces;
 using Billetterie.Application.ResultsEnum;
 using Billetterie.Domain.Entities;
-using Billetterie.Infrastructure.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,25 +15,20 @@ namespace Billetterie.Api.Controllers
     public class ReservationController : ControllerBase
     {
         private readonly IReservationService _reservationService;
-        private readonly IUtilisateurService _utilisateurService;
+        private readonly IUtilisateurCourant _utilisateurCourant;
 
-        public ReservationController(IReservationService reservationService, IUtilisateurService utilisateurService)
+        public ReservationController(IReservationService reservationService, IUtilisateurCourant utilisateurCourant)
         {
             _reservationService = reservationService;
-            _utilisateurService = utilisateurService;
+            _utilisateurCourant = utilisateurCourant;
 
         }
 
+        [Authorize]
         [HttpPost]
         public async Task<IActionResult> CreateReservation(CreationReservationDto form)
         {
-            var keycloakId = User.GetKeycloakId();
-            if (keycloakId is null)
-            {
-                return BadRequest("Token invalide");
-            }
-
-            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
+            var utilisateur = await _utilisateurCourant.GetAsync();
 
             if (utilisateur is null)
             {

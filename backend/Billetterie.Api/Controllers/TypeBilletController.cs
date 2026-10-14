@@ -1,8 +1,7 @@
-﻿using Billetterie.Api.Extensions;
+﻿using Billetterie.Api.Auth;
 using Billetterie.Application.DTOs;
 using Billetterie.Application.Interfaces;
 using Billetterie.Domain.Entities;
-using Billetterie.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -15,42 +14,29 @@ namespace Billetterie.Api.Controllers
     {
         private readonly ITypeBilletService _typeBilletService;
         private readonly IEvenementService _evenementService;
-        public readonly IUtilisateurService _utilisateurService;
+        private readonly IUtilisateurCourant _utilisateurCourant;
 
         public TypeBilletController(
             ITypeBilletService typeBilletService,
             IEvenementService evenementService,
-            IUtilisateurService utilisateurService)
+            IUtilisateurCourant utilisateurCourant)
         {
             _typeBilletService = typeBilletService;
             _evenementService = evenementService;
-            _utilisateurService = utilisateurService;
+            _utilisateurCourant = utilisateurCourant;
         }
 
-        [Authorize(Roles = "Organisateur")]
+        [Authorize(Policy = Policies.OrganisateurValide)]
         [HttpPost]
         public async Task<IActionResult> CreateTypeBillet(Guid evenementId, CreationTypeBilletDto form)
         {
-            var keycloakId = User.GetKeycloakId();
-            if (keycloakId is null)
-            {
-                return BadRequest("Token invalide");
-            }
-
-            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
-
-            if (utilisateur?.Organisateur is null)
-            {
-                return Forbid();
-            }
-
             var evenement = await _evenementService.GetEvenementByIdAsync(evenementId);
             if (evenement is null)
             {
                 return NotFound();
             }
 
-            if (evenement.OrganisateurId != utilisateur.Organisateur.Id)
+            if (evenement.OrganisateurId != await _utilisateurCourant.GetOrganisateurIdAsync())
             {
                 return Forbid();
             }
@@ -96,29 +82,17 @@ namespace Billetterie.Api.Controllers
                 
         }
 
-        [Authorize(Roles = "Organisateur")]
+        [Authorize(Policy = Policies.OrganisateurValide)]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateTypeBillet(Guid evenementId, Guid id, UpdateTypeBilletDto updated)
         {
-            var keycloakId = User.GetKeycloakId();
-            if (keycloakId is null)
-            {
-                return BadRequest("Token invalide");
-            }
-
-            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
-            if (utilisateur?.Organisateur is null)
-            {
-                return Forbid();
-            }
-
             var evenement = await _evenementService.GetEvenementByIdAsync(evenementId);
             if (evenement is null)
             {
                 return NotFound();
             }
 
-            if (evenement.OrganisateurId != utilisateur.Organisateur.Id)
+            if (evenement.OrganisateurId != await _utilisateurCourant.GetOrganisateurIdAsync())
             {
                 return Forbid();
             }
@@ -153,29 +127,17 @@ namespace Billetterie.Api.Controllers
             return Ok(new { typeBillet.Id, typeBillet.Nom, typeBillet.Prix, typeBillet.QuantiteTotale });
         }
 
-        [Authorize(Roles = "Organisateur")]
+        [Authorize(Policy = Policies.OrganisateurValide)]
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteTypeBillet(Guid evenementId, Guid id)
         {
-            var keycloakId = User.GetKeycloakId();
-            if (keycloakId is null)
-            {
-                return BadRequest("Token invalide");
-            }
-
-            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
-            if (utilisateur?.Organisateur is null)
-            {
-                return Forbid();
-            }
-
             var evenement = await _evenementService.GetEvenementByIdAsync(evenementId);
             if (evenement is null)
             {
                 return NotFound();
             }
 
-            if (evenement.OrganisateurId != utilisateur.Organisateur.Id)
+            if (evenement.OrganisateurId != await _utilisateurCourant.GetOrganisateurIdAsync())
             {
                 return Forbid();
             }

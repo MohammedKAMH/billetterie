@@ -4,8 +4,10 @@ using Billetterie.Infrastructure.Data;
 using Billetterie.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.JsonWebTokens;
+using Scalar.AspNetCore;
 // %APPDATA%\Microsoft\UserSecrets\
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,7 +26,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.RequireHttpsMetadata = false;
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+    options.AddPolicy(Policies.OrganisateurValide, policy => policy
+        .RequireRole("Organisateur")
+        .AddRequirements(new OrganisateurValideRequirement())));
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -38,12 +43,18 @@ builder.Services.AddScoped<IEvenementService, EvenementService>();
 builder.Services.AddScoped<ITypeBilletService, TypeBilletService>(); 
 builder.Services.AddScoped<IReservationService, ReservationService>();
 
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IUtilisateurCourant, UtilisateurCourant>();
+builder.Services.AddScoped<IAuthorizationHandler, OrganisateurValideHandler>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference();
+
 }
 
 app.UseHttpsRedirection();

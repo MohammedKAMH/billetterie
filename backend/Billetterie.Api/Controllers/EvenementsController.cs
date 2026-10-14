@@ -1,4 +1,4 @@
-﻿using Billetterie.Api.Extensions;
+﻿using Billetterie.Api.Auth;
 using Billetterie.Application.DTOs;
 using Billetterie.Application.Interfaces;
 using Billetterie.Domain.Entities;
@@ -12,44 +12,26 @@ namespace Billetterie.Api.Controllers
     public class EvenementsController : ControllerBase
     {
         private readonly IEvenementService _evenementService;
-        private readonly IUtilisateurService _utilisateurService;
-        public readonly ITypeBilletService _typeBilletService;
+        private readonly IUtilisateurCourant _utilisateurCourant;
+        private readonly ITypeBilletService _typeBilletService;
 
         public EvenementsController(IEvenementService evenementService,
-            IUtilisateurService utilisateurService,
+            IUtilisateurCourant utilisateurCourant,
             ITypeBilletService typeBilletService)
         {
             _evenementService = evenementService;
-            _utilisateurService = utilisateurService;
+            _utilisateurCourant = utilisateurCourant;
             _typeBilletService = typeBilletService;
         }
 
-        [Authorize(Roles = "Organisateur")]
+        [Authorize(Policy = Policies.OrganisateurValide)]
         [HttpPost]
         public async Task<IActionResult> CreateEvenement(CreationEvenementDto evenementForm)
         {
-            var keycloakId = User.GetKeycloakId();
-            if (keycloakId is null)
-            {
-                return BadRequest("Token invalide");
-            }
-
-            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
-
-            if (utilisateur?.Organisateur is null)
-            {
-                return Forbid();
-            }
-
-            if (utilisateur.Organisateur.StatutValidation != StatutValidation.Valide)
-            {
-                return Forbid();
-            }
-
             var evenement = new Evenement
             {
                 Id = Guid.NewGuid(),
-                OrganisateurId = utilisateur.Organisateur.Id,
+                OrganisateurId = await _utilisateurCourant.GetOrganisateurIdAsync(),
                 Titre = evenementForm.Titre,
                 Lieu = evenementForm.Lieu,
                 Description = evenementForm.Description,
@@ -104,29 +86,17 @@ namespace Billetterie.Api.Controllers
             return Ok(dtos);
         }
 
-        [Authorize(Roles = "Organisateur")]
+        [Authorize(Policy = Policies.OrganisateurValide)]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateEvenement(Guid id, UpdateEvenementDto update)
         {
-            var keycloakId = User.GetKeycloakId();
-            if (keycloakId is null)
-            {
-                return BadRequest("Token invalide");
-            }
-
-            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
-            if (utilisateur?.Organisateur is null)
-            {
-                return Forbid();
-            }
-
             var evenement = await _evenementService.GetEvenementByIdAsync(id);
             if (evenement is null)
             {
                 return NotFound();
             }
 
-            if (evenement.OrganisateurId != utilisateur.Organisateur.Id)
+            if (evenement.OrganisateurId != await _utilisateurCourant.GetOrganisateurIdAsync())
             {
                 return Forbid();
             }
@@ -142,34 +112,17 @@ namespace Billetterie.Api.Controllers
             return Ok(new { evenement.Id, evenement.Titre, statut = evenement.Statut });
         }
 
-        [Authorize(Roles = "Organisateur")]
+        [Authorize(Policy = Policies.OrganisateurValide)]
         [HttpDelete("{id}")]
         public async Task<IActionResult> AnnulerEvenement(Guid id)
         {
-            var keycloakId = User.GetKeycloakId();
-            if (keycloakId is null)
-            {
-                return BadRequest("Token invalide");
-            }
-
-            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
-
-            if (utilisateur?.Organisateur is null)
-            {
-                return Forbid();
-            }
-
-            if (utilisateur.Organisateur.StatutValidation != StatutValidation.Valide)
-            {
-                return Forbid();
-            }
             var evenement = await _evenementService.GetEvenementByIdAsync(id);
             if(evenement is null)
             {
                 return NotFound();
             }
 
-            if (evenement.OrganisateurId != utilisateur.Organisateur.Id)
+            if (evenement.OrganisateurId != await _utilisateurCourant.GetOrganisateurIdAsync())
             {
                 return Forbid();
             }
@@ -184,34 +137,17 @@ namespace Billetterie.Api.Controllers
             return NoContent();
         }
 
-        [Authorize(Roles = "Organisateur")]
+        [Authorize(Policy = Policies.OrganisateurValide)]
         [HttpPost("{id}/publier")]
         public async Task<IActionResult> PublierEvenement(Guid id)
         {
-            var keycloakId = User.GetKeycloakId();
-            if (keycloakId is null)
-            {
-                return BadRequest("Token invalide");
-            }
-
-            var utilisateur = await _utilisateurService.GetUtilisateurAsync(keycloakId);
-
-            if (utilisateur?.Organisateur is null)
-            {
-                return Forbid();
-            }
-
-            if (utilisateur.Organisateur.StatutValidation != StatutValidation.Valide)
-            {
-                return Forbid();
-            }
             var evenement = await _evenementService.GetEvenementByIdAsync(id);
             if (evenement is null)
             {
                 return NotFound();
             }
 
-            if (evenement.OrganisateurId != utilisateur.Organisateur.Id)
+            if (evenement.OrganisateurId != await _utilisateurCourant.GetOrganisateurIdAsync())
             {
                 return Forbid();
             }
