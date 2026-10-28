@@ -48,7 +48,7 @@ namespace Billetterie.Api.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetEvenementById(Guid id)
         {
-            var evenement = await _evenementService.GetEvenementByIdAsync(id);
+            var evenement = await _evenementService.GetPublishedEvenementByIdAsync(id);
             if (evenement is null)
             {
                 return NotFound();

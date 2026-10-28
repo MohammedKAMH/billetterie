@@ -13,8 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddDbContext<BilletterieDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("BilletterieDb"))
-            .EnableSensitiveDataLogging());
+    options.UseNpgsql(builder.Configuration.GetConnectionString("BilletterieDb")));
 
 JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
@@ -57,7 +56,10 @@ if (app.Environment.IsDevelopment())
 
 }
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
