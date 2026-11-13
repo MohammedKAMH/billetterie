@@ -433,3 +433,4 @@ FodyWeavers.xsd
 
 .env
 frontend/node_modules/
+scripts
