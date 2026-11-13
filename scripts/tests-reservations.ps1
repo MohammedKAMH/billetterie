@@ -1,0 +1,171 @@
+# Tests de la reservation. Prerequis : API sur http://localhost:5178, Keycloak lance,
+# comptes orgaa (organisateur valide) et utilisateurdetest (deja passe par /sync).
+# Avant de lancer :  $env:TEST_PWD = "mot_de_passe_des_comptes_de_test"
+
+if (-not $env:TEST_PWD) { Write-Host "Definis d'abord `$env:TEST_PWD" -ForegroundColor Red; return }
+
+$api  = "http://localhost:5178/api"
+$evts = "$api/evenements"
+$resa = "$api/reservations"
+
+function Get-Token($user) {
+    (Invoke-RestMethod -Uri "http://localhost:8080/realms/billetterie/protocol/openid-connect/token" -Method Post `
+        -Body @{client_id="billetterie-front"; grant_type="password"; username=$user; password=$env:TEST_PWD}).access_token
+}
+
+function Appel($methode, $url, $token, $corps) {
+    $h = @{}
+    if ($token) { $h.Authorization = "Bearer $token" }
+    $p = @{ Uri=$url; Method=$methode; Headers=$h; UseBasicParsing=$true; ContentType="application/json; charset=utf-8" }
+    if ($null -ne $corps) { $p.Body = [Text.Encoding]::UTF8.GetBytes(($corps | ConvertTo-Json -Depth 6)) }
+    $json = $null
+    try {
+        $r = Invoke-WebRequest @p
+        $code = [int]$r.StatusCode
+        if ($r.Content) { try { $json = $r.Content | ConvertFrom-Json } catch {} }
+    } catch {
+        if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
+        else { $code = "ERREUR : " + $_.Exception.Message }
+    }
+    [pscustomobject]@{ Code = $code; Json = $json }
+}
+
+$script:ok = 0; $script:ko = 0
+function Verifier($nom, $attendu, $obtenu) {
+    if ("$attendu" -eq "$obtenu") { $script:ok++; Write-Host ("OK     {0} (attendu {1})" -f $nom, $attendu) -ForegroundColor Green }
+    else { $script:ko++; Write-Host ("ECHEC  {0} : attendu {1}, obtenu {2}" -f $nom, $attendu, $obtenu) -ForegroundColor Red }
+}
+
+function Demande($typeId, $quantite) { @{ typeBilletId = $typeId; quantite = $quantite } }
+function Reserver($token, $lignes) { Appel Post $resa $token @{ lignes = @($lignes) } }
+
+function Dispo($evtId, $typeId) {
+    $r = Appel Get "$evts/$evtId/types-billet" $null $null
+    (@($r.Json) | Where-Object { $_.id -eq $typeId }).quantiteDisponible
+}
+
+function Nouvel-Evenement($token, $titre, $dateDebut) {
+    $corps = @{ titre=$titre; description="Test"; lieu="Paris"; dateDebut=$dateDebut
+                dateFin=([datetime]$dateDebut).AddHours(3).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") }
+    (Appel Post $evts $token $corps).Json.id
+}
+
+function Nouveau-Tarif($token, $evtId, $nom, $prix, $quantite) {
+    (Appel Post "$evts/$evtId/types-billet" $token @{ nom=$nom; prix=$prix; quantiteTotale=$quantite }).Json.id
+}
+
+# --- Preparation ---
+$tA = Get-Token "orgaa"
+$tC = Get-Token "utilisateurdetest"
+$futur = (Get-Date).AddMonths(2).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+$passe = "2020-01-01T20:00:00Z"
+
+# Evenement A : publie, futur, Standard 25 EUR x 10 places, VIP 50 EUR x 5 places
+$evtA      = Nouvel-Evenement $tA "Concert reservation A" $futur
+$standard  = Nouveau-Tarif $tA $evtA "Standard" 25 10
+$vip       = Nouveau-Tarif $tA $evtA "VIP" 50 5
+Verifier "Prep publier l'evenement A" 204 (Appel Post "$evts/$evtA/publier" $tA $null).Code
+
+# Evenement B : reste en brouillon, avec un tarif
+$evtB   = Nouvel-Evenement $tA "Concert brouillon B" $futur
+$tarifB = Nouveau-Tarif $tA $evtB "Standard B" 20 10
+
+# Evenement C : publie mais deja commence
+$evtC   = Nouvel-Evenement $tA "Concert passe C" $passe
+$tarifC = Nouveau-Tarif $tA $evtC "Standard C" 20 10
+Verifier "Prep publier l'evenement C" 204 (Appel Post "$evts/$evtC/publier" $tA $null).Code
+
+Write-Host "`n--- Reservations ---"
+
+# R1 : sans token
+Verifier "R1  reservation sans token" 401 (Reserver $null @(Demande $standard 1)).Code
+
+# R2 : reservation valide, 2 x Standard
+$r2 = Reserver $tC @(Demande $standard 2)
+Verifier "R2  reservation valide" 201 $r2.Code
+Verifier "R2a montant total (2 x 25)" 50 $r2.Json.montantTotal
+Verifier "R2b nombre de billets" 2 @($r2.Json.billets).Count
+Verifier "R2c statut EnAttente (0)" 0 $r2.Json.statutPaiement
+Verifier "R2d code unique masque avant paiement" "" (@($r2.Json.billets | Where-Object { $_.codeUnique }) -join "")
+Verifier "R2e nom du type de billet rempli" "Standard" @($r2.Json.billets)[0].nomTypeBillet
+
+# R3 : stock decremente
+Verifier "R3  places restantes apres 2 reservees" 8 (Dispo $evtA $standard)
+
+# R4 a R7 : demandes invalides
+Verifier "R4  meme type deux fois" 400 (Reserver $tC @((Demande $standard 1), (Demande $standard 1))).Code
+Verifier "R5  liste de lignes vide" 400 (Reserver $tC @()).Code
+Verifier "R6a quantite 0" 400 (Reserver $tC @(Demande $standard 0)).Code
+Verifier "R6b quantite 11" 400 (Reserver $tC @(Demande $standard 11)).Code
+Verifier "R7  type de billet inexistant" 404 (Reserver $tC @(Demande ([guid]::NewGuid()) 1)).Code
+
+# R8 : stock insuffisant. Il reste 8 places : 9 est refuse, le stock ne bouge pas.
+Verifier "R8  9 places demandees, 8 restantes" 409 (Reserver $tC @(Demande $standard 9)).Code
+Verifier "R8a stock inchange" 8 (Dispo $evtA $standard)
+
+# R9 : transaction. Standard (ok) + 99 VIP (impossible) : tout est annule.
+Verifier "R9  Standard ok + VIP trop demande" 409 (Reserver $tC @((Demande $standard 2), (Demande $vip 10))).Code
+Verifier "R9a stock Standard intact (transaction annulee)" 8 (Dispo $evtA $standard)
+Verifier "R9b stock VIP intact" 5 (Dispo $evtA $vip)
+
+# R10 a R12 : evenements non reservables
+Verifier "R10 evenement en brouillon" 404 (Reserver $tC @(Demande $tarifB 1)).Code
+Verifier "R11 types de deux evenements differents" 400 (Reserver $tC @((Demande $standard 1), (Demande $tarifB 1))).Code
+Verifier "R12 evenement deja commence" 409 (Reserver $tC @(Demande $tarifC 1)).Code
+
+# R13 : on prend les 8 dernieres places, puis une de plus
+Verifier "R13 les 8 dernieres places" 201 (Reserver $tC @(Demande $standard 8)).Code
+Verifier "R13a plus aucune place" 0 (Dispo $evtA $standard)
+Verifier "R14 une place de plus" 409 (Reserver $tC @(Demande $standard 1)).Code
+Verifier "R14a stock reste a 0" 0 (Dispo $evtA $standard)
+
+Write-Host ("`nResultat : {0} OK, {1} ECHEC" -f $script:ok, $script:ko) -ForegroundColor $(if ($script:ko -eq 0) { "Green" } else { "Red" })
+
+Write-Host "`n--- Paiement ---"
+$tB = Get-Token "orgab"
+
+$evtP = Nouvel-Evenement $tA "Concert paiement" $futur
+$tarifP = Nouveau-Tarif $tA $evtP "Standard P" 30 10
+Verifier "P0  publier l'evenement P" 204 (Appel Post "$evts/$evtP/publier" $tA $null).Code
+
+$rP = Reserver $tC @(Demande $tarifP 2)
+$resaId = $rP.Json.id
+Verifier "P1  payer sans token" 401 (Appel Post "$resa/$resaId/payer" $null $null).Code
+Verifier "P2  payer la reservation d'un autre" 404 (Appel Post "$resa/$resaId/payer" $tB $null).Code
+Verifier "P3  payer un id inexistant" 404 (Appel Post "$resa/$([guid]::NewGuid())/payer" $tC $null).Code
+
+$pay = Appel Post "$resa/$resaId/payer" $tC $null
+Verifier "P4  payer sa reservation" 200 $pay.Code
+Verifier "P4a statut Paye (1)" 1 $pay.Json.statutPaiement
+Verifier "P4b codes visibles, 22 caracteres" 22 (@($pay.Json.billets)[0].codeUnique).Length
+Verifier "P5  payer une seconde fois" 409 (Appel Post "$resa/$resaId/payer" $tC $null).Code
+
+Write-Host "Resa a faire expirer a la main : $resaId"
+
+
+Write-Host "`n--- Annulation ---"
+$evtN   = Nouvel-Evenement $tA "Concert annulation" $futur
+$tarifN = Nouveau-Tarif $tA $evtN "Standard N" 30 10
+Verifier "N0  publier" 204 (Appel Post "$evts/$evtN/publier" $tA $null).Code
+
+$rN = Reserver $tC @(Demande $tarifN 3)
+$idN = $rN.Json.id
+Verifier "N1  stock apres reservation de 3" 7 (Dispo $evtN $tarifN)
+
+Verifier "N2  annuler sans token" 401 (Appel Post "$resa/$idN/annuler" $null $null).Code
+Verifier "N3  annuler la reservation d'un autre" 404 (Appel Post "$resa/$idN/annuler" $tB $null).Code
+Verifier "N4  annuler un id inexistant" 404 (Appel Post "$resa/$([guid]::NewGuid())/annuler" $tC $null).Code
+
+$ann = Appel Post "$resa/$idN/annuler" $tC $null
+Verifier "N5  annuler sa reservation" 200 $ann.Code
+Verifier "N5a statut Annule (2)" 2 $ann.Json.statutPaiement
+Verifier "N5b stock rendu" 10 (Dispo $evtN $tarifN)
+Verifier "N6  annuler une seconde fois" 409 (Appel Post "$resa/$idN/annuler" $tC $null).Code
+Verifier "N6a stock pas rendu deux fois" 10 (Dispo $evtN $tarifN)
+Verifier "N7  payer une reservation annulee" 409 (Appel Post "$resa/$idN/payer" $tC $null).Code
+
+$rP2 = Reserver $tC @(Demande $tarifN 2)
+$idP2 = $rP2.Json.id
+Appel Post "$resa/$idP2/payer" $tC $null | Out-Null
+Verifier "N8  annuler une reservation payee" 409 (Appel Post "$resa/$idP2/annuler" $tC $null).Code
+Verifier "N8a stock inchange (8)" 8 (Dispo $evtN $tarifN)

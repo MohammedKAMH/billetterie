@@ -8,5 +8,9 @@ namespace Billetterie.Application.Interfaces
     public interface IReservationService
     {
         Task<ResultatReservation> CreerReservationAsync(Guid utilisateurId, IReadOnlyList<LigneDemande> lignes);
+
+        Task<ResultatReservation> PayerReservationAsync(Guid utilisateurId, Guid reservationId);
+
+        Task<ResultatReservation> AnnulerReservationAsync(Guid utilisateurId, Guid reservationId);
     }
 }

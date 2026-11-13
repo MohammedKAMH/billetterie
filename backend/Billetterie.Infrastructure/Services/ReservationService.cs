@@ -112,6 +112,102 @@ namespace Billetterie.Infrastructure.Services
             return ResultatReservation.Reussi(reservation);
         }
 
+        public async Task<ResultatReservation> PayerReservationAsync(Guid utilisateurId, Guid reservationId)
+        {
+            var maintenant = _timeProvider.GetUtcNow().UtcDateTime;
+            var reservation = await _context.Reservations
+                .Include(r => r.Billets)
+                    .ThenInclude(b => b.TypeBillet)
+                .FirstOrDefaultAsync(r => r.Id == reservationId && r.UtilisateurId == utilisateurId);
+            
+            if(reservation == null)
+            {
+                return ResultatReservation.Echec(MotifEchecEnum.ReservationIntrouvable);
+            }
+
+            if(reservation.StatutPaiement != StatutPaiement.EnAttente)
+            {
+                return ResultatReservation.Echec(MotifEchecEnum.ReservationNonPayable);
+            }
+
+            if(reservation.DateExpiration <= maintenant)
+            {
+                return ResultatReservation.Echec(MotifEchecEnum.ReservationExpiree);
+            }
+
+            var lignesAffectees = await _context.Reservations
+                .Where(r => r.Id == reservationId
+                         && r.StatutPaiement == StatutPaiement.EnAttente
+                         && r.DateExpiration > maintenant)
+                .ExecuteUpdateAsync(s => s.SetProperty(
+                    r => r.StatutPaiement,
+                    StatutPaiement.Paye));
+
+            if (lignesAffectees == 0)
+            {
+                return ResultatReservation.Echec(MotifEchecEnum.ReservationNonPayable);
+            }
+
+            reservation.StatutPaiement = StatutPaiement.Paye;
+            return ResultatReservation.Reussi(reservation);
+
+        }
+
+        public async Task<ResultatReservation> AnnulerReservationAsync(Guid utilisateurId, Guid reservationId){
+            var reservation = await _context.Reservations
+                .Include(r => r.Billets)
+                .FirstOrDefaultAsync(r => r.Id == reservationId && r.UtilisateurId == utilisateurId);
+
+            if(reservation is null)
+            {
+                return ResultatReservation.Echec(MotifEchecEnum.ReservationIntrouvable);
+            }
+
+            if(reservation.StatutPaiement != StatutPaiement.EnAttente)
+            {
+                return ResultatReservation.Echec(MotifEchecEnum.ReservationNonAnnulable);
+            }
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            var lignesAffectees = await _context.Reservations
+                    .Where(r => r.Id == reservationId
+                             && r.StatutPaiement == StatutPaiement.EnAttente)
+                    .ExecuteUpdateAsync(s => s.SetProperty(
+                        r => r.StatutPaiement,
+                        StatutPaiement.Annule));
+
+            if (lignesAffectees == 0)
+            {
+                return ResultatReservation.Echec(MotifEchecEnum.ReservationNonAnnulable);
+            }
+
+            await _context.Billets
+                .Where(b => b.ReservationId == reservationId)
+                .ExecuteUpdateAsync(s => s.SetProperty(
+                    b => b.Statut,
+                    BilletStatut.Annule));
+
+            var parType = reservation.Billets
+                .GroupBy(b => b.TypeBilletId)
+                .Select(g => new { TypeBilletId = g.Key, Nombre = g.Count() });
+
+            foreach(var groupe in parType)
+            {
+                await _context.TypeBillets  
+                    .Where(t => t.Id == groupe.TypeBilletId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(
+                        t => t.QuantiteVendue,
+                        t=> t.QuantiteVendue - groupe.Nombre));
+            }
+
+            await transaction.CommitAsync();
+            reservation.StatutPaiement = StatutPaiement.Annule;
+            foreach (var b in reservation.Billets) b.Statut = BilletStatut.Annule;
+            return ResultatReservation.Reussi(reservation);
+        }
+
+
         private static string GenererCode()
             => Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(16));
     }

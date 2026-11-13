@@ -11,6 +11,10 @@ namespace Billetterie.Application.ResultsEnum
         TypesBilletDEvenementsDifferents,
         EvenementDejaCommence,
         StockInsuffisant,
-        LigneEnDouble
+        LigneEnDouble,
+        ReservationIntrouvable,
+        ReservationNonPayable,
+        ReservationExpiree,
+        ReservationNonAnnulable,
     }
 }
