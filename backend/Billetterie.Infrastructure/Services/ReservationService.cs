@@ -208,6 +208,27 @@ namespace Billetterie.Infrastructure.Services
         }
 
 
+        public async Task<IList<Reservation>> GetReservationsAsync(Guid utilisateurId)
+        {
+            return await _context.Reservations
+                .AsNoTracking()
+                .Include(r => r.Billets)
+                    .ThenInclude(b => b.TypeBillet)
+                .Where(r => r.UtilisateurId == utilisateurId)
+                .OrderByDescending(r => r.DateReservation)
+                .ToListAsync();
+               
+        }
+        public async Task<Reservation?> GetReservationByIdAsync(Guid utilisateurId, Guid reservationId)
+        {
+            return await _context.Reservations
+                .AsNoTracking()
+                .Include(r => r.Billets)
+                    .ThenInclude(b => b.TypeBillet)
+                .FirstOrDefaultAsync(r => r.Id == reservationId && r.UtilisateurId == utilisateurId);
+        }
+
+
         private static string GenererCode()
             => Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(16));
     }

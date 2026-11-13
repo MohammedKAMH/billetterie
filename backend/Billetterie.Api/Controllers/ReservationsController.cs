@@ -93,6 +93,41 @@ namespace Billetterie.Api.Controllers
             return Ok(dto);
         }
 
+        [Authorize]
+        [HttpGet]
+        public async Task<IActionResult> GetReservations()
+        {
+            var utilisateur = await _utilisateurCourant.GetAsync();
+            if (utilisateur is null)
+            {
+                return BadRequest("Utilisateur inconnu");
+            }
+
+            var reservations = await _reservationService.GetReservationsAsync(utilisateur.Id);
+
+            return Ok(reservations.Select(VersDto));
+        }
+
+        [Authorize]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetReservationById(Guid id)
+        {
+            var utilisateur = await _utilisateurCourant.GetAsync();
+            if (utilisateur is null)
+            {
+                return BadRequest("Utilisateur inconnu");
+            }
+
+            var reservation = await _reservationService.GetReservationByIdAsync(utilisateur.Id, id);
+
+            if(reservation is null)
+            {
+                return NotFound();
+            }
+            
+            return Ok(VersDto(reservation));
+        }
+
 
 
         private IActionResult VersReponseEchec(MotifEchecEnum? motif)

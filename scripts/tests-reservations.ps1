@@ -1,5 +1,5 @@
-# Tests de la reservation. Prerequis : API sur http://localhost:5178, Keycloak lance,
-# comptes orgaa (organisateur valide) et utilisateurdetest (deja passe par /sync).
+# Tests reservations : creation, paiement, annulation, consultation, expiration.
+# Prerequis : API sur http://localhost:5178 (sans point d'arret), Keycloak et conteneur billetterie-db lances.
 # Avant de lancer :  $env:TEST_PWD = "mot_de_passe_des_comptes_de_test"
 
 if (-not $env:TEST_PWD) { Write-Host "Definis d'abord `$env:TEST_PWD" -ForegroundColor Red; return }
@@ -54,8 +54,15 @@ function Nouveau-Tarif($token, $evtId, $nom, $prix, $quantite) {
     (Appel Post "$evts/$evtId/types-billet" $token @{ nom=$nom; prix=$prix; quantiteTotale=$quantite }).Json.id
 }
 
+# Force l'expiration d'une reservation via le conteneur Postgres (pas besoin de DBeaver)
+function Forcer-Expiration($reservationId) {
+    $sql = "UPDATE ""Reservations"" SET ""DateExpiration"" = now() - interval '1 minute' WHERE ""Id"" = '$reservationId';"
+    $sql | docker exec -i billetterie-db sh -c 'psql -U "$POSTGRES_USER" -d billetterie' | Out-Null
+}
+
 # --- Preparation ---
 $tA = Get-Token "orgaa"
+$tB = Get-Token "orgab"
 $tC = Get-Token "utilisateurdetest"
 $futur = (Get-Date).AddMonths(2).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 $passe = "2020-01-01T20:00:00Z"
@@ -75,56 +82,48 @@ $evtC   = Nouvel-Evenement $tA "Concert passe C" $passe
 $tarifC = Nouveau-Tarif $tA $evtC "Standard C" 20 10
 Verifier "Prep publier l'evenement C" 204 (Appel Post "$evts/$evtC/publier" $tA $null).Code
 
+# ================= RESERVATIONS =================
 Write-Host "`n--- Reservations ---"
 
-# R1 : sans token
 Verifier "R1  reservation sans token" 401 (Reserver $null @(Demande $standard 1)).Code
 
-# R2 : reservation valide, 2 x Standard
 $r2 = Reserver $tC @(Demande $standard 2)
+$idR2 = $r2.Json.id
 Verifier "R2  reservation valide" 201 $r2.Code
-Verifier "R2a montant total (2 x 25)" 50 $r2.Json.montantTotal
+Verifier "R2a montant total (2 x 25)" $true ([decimal]$r2.Json.montantTotal -eq 50)
 Verifier "R2b nombre de billets" 2 @($r2.Json.billets).Count
 Verifier "R2c statut EnAttente (0)" 0 $r2.Json.statutPaiement
 Verifier "R2d code unique masque avant paiement" "" (@($r2.Json.billets | Where-Object { $_.codeUnique }) -join "")
 Verifier "R2e nom du type de billet rempli" "Standard" @($r2.Json.billets)[0].nomTypeBillet
 
-# R3 : stock decremente
 Verifier "R3  places restantes apres 2 reservees" 8 (Dispo $evtA $standard)
 
-# R4 a R7 : demandes invalides
 Verifier "R4  meme type deux fois" 400 (Reserver $tC @((Demande $standard 1), (Demande $standard 1))).Code
 Verifier "R5  liste de lignes vide" 400 (Reserver $tC @()).Code
 Verifier "R6a quantite 0" 400 (Reserver $tC @(Demande $standard 0)).Code
 Verifier "R6b quantite 11" 400 (Reserver $tC @(Demande $standard 11)).Code
 Verifier "R7  type de billet inexistant" 404 (Reserver $tC @(Demande ([guid]::NewGuid()) 1)).Code
 
-# R8 : stock insuffisant. Il reste 8 places : 9 est refuse, le stock ne bouge pas.
 Verifier "R8  9 places demandees, 8 restantes" 409 (Reserver $tC @(Demande $standard 9)).Code
 Verifier "R8a stock inchange" 8 (Dispo $evtA $standard)
 
-# R9 : transaction. Standard (ok) + 99 VIP (impossible) : tout est annule.
 Verifier "R9  Standard ok + VIP trop demande" 409 (Reserver $tC @((Demande $standard 2), (Demande $vip 10))).Code
 Verifier "R9a stock Standard intact (transaction annulee)" 8 (Dispo $evtA $standard)
 Verifier "R9b stock VIP intact" 5 (Dispo $evtA $vip)
 
-# R10 a R12 : evenements non reservables
 Verifier "R10 evenement en brouillon" 404 (Reserver $tC @(Demande $tarifB 1)).Code
 Verifier "R11 types de deux evenements differents" 400 (Reserver $tC @((Demande $standard 1), (Demande $tarifB 1))).Code
 Verifier "R12 evenement deja commence" 409 (Reserver $tC @(Demande $tarifC 1)).Code
 
-# R13 : on prend les 8 dernieres places, puis une de plus
 Verifier "R13 les 8 dernieres places" 201 (Reserver $tC @(Demande $standard 8)).Code
 Verifier "R13a plus aucune place" 0 (Dispo $evtA $standard)
 Verifier "R14 une place de plus" 409 (Reserver $tC @(Demande $standard 1)).Code
 Verifier "R14a stock reste a 0" 0 (Dispo $evtA $standard)
 
-Write-Host ("`nResultat : {0} OK, {1} ECHEC" -f $script:ok, $script:ko) -ForegroundColor $(if ($script:ko -eq 0) { "Green" } else { "Red" })
-
+# ================= PAIEMENT =================
 Write-Host "`n--- Paiement ---"
-$tB = Get-Token "orgab"
 
-$evtP = Nouvel-Evenement $tA "Concert paiement" $futur
+$evtP   = Nouvel-Evenement $tA "Concert paiement" $futur
 $tarifP = Nouveau-Tarif $tA $evtP "Standard P" 30 10
 Verifier "P0  publier l'evenement P" 204 (Appel Post "$evts/$evtP/publier" $tA $null).Code
 
@@ -140,10 +139,15 @@ Verifier "P4a statut Paye (1)" 1 $pay.Json.statutPaiement
 Verifier "P4b codes visibles, 22 caracteres" 22 (@($pay.Json.billets)[0].codeUnique).Length
 Verifier "P5  payer une seconde fois" 409 (Appel Post "$resa/$resaId/payer" $tC $null).Code
 
-Write-Host "Resa a faire expirer a la main : $resaId"
+# Reservation non payee dont on force l'expiration
+$rE = Reserver $tC @(Demande $tarifP 1)
+$idE = $rE.Json.id
+Forcer-Expiration $idE
+Verifier "P6  payer une reservation expiree" 409 (Appel Post "$resa/$idE/payer" $tC $null).Code
 
-
+# ================= ANNULATION =================
 Write-Host "`n--- Annulation ---"
+
 $evtN   = Nouvel-Evenement $tA "Concert annulation" $futur
 $tarifN = Nouveau-Tarif $tA $evtN "Standard N" 30 10
 Verifier "N0  publier" 204 (Appel Post "$evts/$evtN/publier" $tA $null).Code
@@ -169,3 +173,44 @@ $idP2 = $rP2.Json.id
 Appel Post "$resa/$idP2/payer" $tC $null | Out-Null
 Verifier "N8  annuler une reservation payee" 409 (Appel Post "$resa/$idP2/annuler" $tC $null).Code
 Verifier "N8a stock inchange (8)" 8 (Dispo $evtN $tarifN)
+
+# ================= CONSULTATION =================
+Write-Host "`n--- Consultation ---"
+
+Verifier "L1  liste sans token" 401 (Appel Get $resa $null $null).Code
+
+$liste = Appel Get $resa $tC $null
+Verifier "L2  liste du client" 200 $liste.Code
+Verifier "L2a contient la reservation payee" 1 @($liste.Json | Where-Object { $_.id -eq $resaId }).Count
+Verifier "L2b la plus recente en premier" $idP2 @($liste.Json)[0].id
+
+$listeB = Appel Get $resa $tB $null
+Verifier "L3  liste d'un utilisateur sans reservation" 200 $listeB.Code
+Verifier "L3a liste vide" 0 @($listeB.Json | Where-Object { $_ }).Count
+
+$listeA = Appel Get $resa $tA $null
+Verifier "L3b orgaa ne voit pas les reservations du client" 0 @($listeA.Json | Where-Object { $_.id -eq $resaId }).Count
+
+Verifier "L4  detail sans token" 401 (Appel Get "$resa/$resaId" $null $null).Code
+
+$d = Appel Get "$resa/$resaId" $tC $null
+Verifier "L5  detail de sa reservation payee" 200 $d.Code
+Verifier "L5a statut Paye (1)" 1 $d.Json.statutPaiement
+Verifier "L5b codes visibles apres paiement" 22 (@($d.Json.billets)[0].codeUnique).Length
+Verifier "L5c nom du type de billet rempli" "Standard P" @($d.Json.billets)[0].nomTypeBillet
+
+$dEnAttente = Appel Get "$resa/$idR2" $tC $null
+Verifier "L6  detail d'une reservation en attente" 200 $dEnAttente.Code
+Verifier "L6a codes masques avant paiement" "" (@($dEnAttente.Json.billets | Where-Object { $_.codeUnique }) -join "")
+
+$dAnn = Appel Get "$resa/$idN" $tC $null
+Verifier "L7  detail d'une reservation annulee" 200 $dAnn.Code
+Verifier "L7a statut Annule (2)" 2 $dAnn.Json.statutPaiement
+Verifier "L7b billets annules en base (2)" 2 @($dAnn.Json.billets)[0].statut
+
+Verifier "L8  detail de la reservation d'un autre" 404 (Appel Get "$resa/$resaId" $tB $null).Code
+Verifier "L8a meme chose avec un organisateur" 404 (Appel Get "$resa/$resaId" $tA $null).Code
+Verifier "L9  detail d'un id inexistant" 404 (Appel Get "$resa/$([guid]::NewGuid())" $tC $null).Code
+
+# ================= RESULTAT =================
+Write-Host ("`nResultat : {0} OK, {1} ECHEC" -f $script:ok, $script:ko) -ForegroundColor $(if ($script:ko -eq 0) { "Green" } else { "Red" })
