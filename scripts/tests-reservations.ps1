@@ -212,5 +212,40 @@ Verifier "L8  detail de la reservation d'un autre" 404 (Appel Get "$resa/$resaId
 Verifier "L8a meme chose avec un organisateur" 404 (Appel Get "$resa/$resaId" $tA $null).Code
 Verifier "L9  detail d'un id inexistant" 404 (Appel Get "$resa/$([guid]::NewGuid())" $tC $null).Code
 
+Write-Host "`n--- Expiration automatique ---"
+
+function Forcer-Expiration($id) {
+    $sql = "UPDATE ""Reservations"" SET ""DateExpiration"" = now() - interval '1 minute' WHERE ""Id"" = '$id';"
+    $sql | docker exec -i billetterie-db sh -c 'psql -U "$POSTGRES_USER" -d billetterie' | Out-Null
+}
+
+function Statut($id, $token) { (Appel Get "$resa/$id" $token $null).Json.statutPaiement }
+
+$evtE   = Nouvel-Evenement $tA "Concert expiration" $futur
+$tarifE = Nouveau-Tarif $tA $evtE "Standard E" 20 10
+Verifier "E0  publier l'evenement E" 204 (Appel Post "$evts/$evtE/publier" $tA $null).Code
+
+# A : en attente, sera expiree (3 places)
+# B : payee, puis date forcee dans le passe (2 places)
+# C : en attente, date non touchee (1 place)
+$idA = (Reserver $tC @(Demande $tarifE 3)).Json.id
+$idB = (Reserver $tC @(Demande $tarifE 2)).Json.id
+$idC = (Reserver $tC @(Demande $tarifE 1)).Json.id
+Appel Post "$resa/$idB/payer" $tC $null | Out-Null
+Verifier "E0a stock apres 3 reservations (10 - 6)" 4 (Dispo $evtE $tarifE)
+
+Forcer-Expiration $idA
+Forcer-Expiration $idB
+Write-Host "Attente du service d'expiration (15 s)..."
+Start-Sleep -Seconds 70
+
+$tC = Get-Token "utilisateurdetest"   # token frais
+Verifier "E1  reservation expiree : statut Expire (3)"       3 (Statut $idA $tC)
+Verifier "E2  stock de A rendu (4 + 3 - ... = 7)"             7 (Dispo $evtE $tarifE)
+Verifier "E3  payer une reservation expiree"                  409 (Appel Post "$resa/$idA/payer" $tC $null).Code
+Verifier "E3a annuler une reservation expiree"                409 (Appel Post "$resa/$idA/annuler" $tC $null).Code
+Verifier "E4  reservation payee jamais expiree (Paye = 1)"    1 (Statut $idB $tC)
+Verifier "E5  reservation en cours non touchee (0)"           0 (Statut $idC $tC)
+Verifier "E6  billets de A annules"                           3 (@((Appel Get "$resa/$idA" $tC $null).Json.billets | Where-Object { $_.statut -eq 2 }) | Measure-Object).Count
 # ================= RESULTAT =================
 Write-Host ("`nResultat : {0} OK, {1} ECHEC" -f $script:ok, $script:ko) -ForegroundColor $(if ($script:ko -eq 0) { "Green" } else { "Red" })

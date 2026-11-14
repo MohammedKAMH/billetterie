@@ -16,5 +16,6 @@ namespace Billetterie.Application.Interfaces
 
         Task<IList<Reservation>> GetReservationsAsync(Guid utilisateurId);
         Task<Reservation?> GetReservationByIdAsync(Guid utilisateurId, Guid reservationId);
+        Task<int> ExpirerReservationsAsync(CancellationToken ct = default);
     }
 }

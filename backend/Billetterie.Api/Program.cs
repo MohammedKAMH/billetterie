@@ -1,4 +1,5 @@
 using Billetterie.Api.Auth;
+using Billetterie.Api.BackgroundServices;
 using Billetterie.Application.Interfaces;
 using Billetterie.Infrastructure.Data;
 using Billetterie.Infrastructure.Services;
@@ -8,8 +9,19 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Scalar.AspNetCore;
+
 // %APPDATA%\Microsoft\UserSecrets\
 var builder = WebApplication.CreateBuilder(args);
+
+var front = "NomPolitiqueFront";
+
+var origins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
+
+builder.Services.AddCors(options =>
+options.AddPolicy(front, policy => policy
+    .WithOrigins(origins)
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
 
 // Add services to the container.
 builder.Services.AddDbContext<BilletterieDbContext>(options =>
@@ -27,6 +39,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.OrganisateurValide, policy => policy
+        .RequireAuthenticatedUser()
         .RequireRole("Organisateur")
         .AddRequirements(new OrganisateurValideRequirement())));
 
@@ -41,12 +54,15 @@ builder.Services.AddScoped<IUtilisateurService,UtilisateurService>();
 builder.Services.AddScoped<IEvenementService, EvenementService>();
 builder.Services.AddScoped<ITypeBilletService, TypeBilletService>(); 
 builder.Services.AddScoped<IReservationService, ReservationService>();
+builder.Services.AddHostedService<ExpirationReservationsService>();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUtilisateurCourant, UtilisateurCourant>();
 builder.Services.AddScoped<IAuthorizationHandler, OrganisateurValideHandler>();
 
 var app = builder.Build();
+
+app.UseCors(front);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

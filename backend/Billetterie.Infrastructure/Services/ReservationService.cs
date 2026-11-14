@@ -207,6 +207,27 @@ namespace Billetterie.Infrastructure.Services
                 .FirstOrDefaultAsync(r => r.Id == reservationId && r.UtilisateurId == utilisateurId);
         }
 
+        public async Task<int> ExpirerReservationsAsync(CancellationToken ct = default)
+        {
+            var maintenant = _timeProvider.GetUtcNow().UtcDateTime;
+            var cpt = 0;
+
+            var ids = await _context.Reservations
+                .Where(r => r.StatutPaiement == StatutPaiement.EnAttente && r.DateExpiration <= maintenant)
+                .Select(r => r.Id)
+                .Take(100)
+                .ToListAsync(ct);
+
+            foreach(var id in ids)
+            {
+                ct.ThrowIfCancellationRequested();
+                var libere = await LibererAsync(id, StatutPaiement.Expire);
+                if (libere) cpt++;
+            }
+            return cpt;
+        }
+
+
 
         private static string GenererCode()
             => Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(16));
