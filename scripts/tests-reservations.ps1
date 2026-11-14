@@ -247,5 +247,19 @@ Verifier "E3a annuler une reservation expiree"                409 (Appel Post "$
 Verifier "E4  reservation payee jamais expiree (Paye = 1)"    1 (Statut $idB $tC)
 Verifier "E5  reservation en cours non touchee (0)"           0 (Statut $idC $tC)
 Verifier "E6  billets de A annules"                           3 (@((Appel Get "$resa/$idA" $tC $null).Json.billets | Where-Object { $_.statut -eq 2 }) | Measure-Object).Count
+
+Write-Host "`n--- Mes evenements ---"
+$evtM = Nouvel-Evenement $tA "Brouillon de orgaa pour M3" $futur
+
+Verifier "M1  sans token" 401 (Appel Get "$evts/mes-evenements" $null $null).Code
+Verifier "M2  client simple (pas organisateur)" 403 (Appel Get "$evts/mes-evenements" $tC $null).Code
+
+$mesA = Appel Get "$evts/mes-evenements" $tA $null
+Verifier "M3  orgaa voit son brouillon" 1 (@($mesA.Json | Where-Object { $_.id -eq $evtM }).Count)
+Verifier "M3a le brouillon a le statut Brouillon (0)" 0 (@($mesA.Json | Where-Object { $_.id -eq $evtM })[0].statut)
+Verifier "M3b le brouillon est absent de la liste publique" 0 (@((Appel Get $evts $null $null).Json | Where-Object { $_.id -eq $evtM }).Count)
+
+$mesB = Appel Get "$evts/mes-evenements" $tB $null
+Verifier "M4  orgab ne voit pas l'evenement de orgaa" 0 (@($mesB.Json | Where-Object { $_.id -eq $evtM }).Count)
 # ================= RESULTAT =================
 Write-Host ("`nResultat : {0} OK, {1} ECHEC" -f $script:ok, $script:ko) -ForegroundColor $(if ($script:ko -eq 0) { "Green" } else { "Red" })

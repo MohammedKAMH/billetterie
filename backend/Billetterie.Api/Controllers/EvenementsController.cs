@@ -168,6 +168,27 @@ namespace Billetterie.Api.Controllers
             return NoContent();
         }
 
+        [Authorize(Policy = Policies.OrganisateurValide)]
+        [HttpGet("mes-evenements")]
+        public async Task<IActionResult> GetMesEvenements()
+        {
+            var organisateurId = await _utilisateurCourant.GetOrganisateurIdAsync();
+            var evenements = await _evenementService.GetEvenementsDeLOrganisateurAsync(organisateurId);
+
+            var dtos = evenements.Select(e => new EvenementOrganisateurDto
+            {
+                Id = e.Id,
+                Titre = e.Titre,
+                Description = e.Description,
+                Lieu = e.Lieu,
+                DateDebut = e.DateDebut,
+                DateFin = e.DateFin,
+                Statut = e.Statut
+            });
+
+            return Ok(dtos);
+        }
+
     }
 
 

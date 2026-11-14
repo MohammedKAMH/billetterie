@@ -62,5 +62,15 @@ namespace Billetterie.Infrastructure.Services
             _context.Evenements.Update(evenement);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<IList<Evenement>> GetEvenementsDeLOrganisateurAsync(Guid organisateurId)
+        {
+            return await _context.Evenements
+                .AsNoTracking()
+                .Where(e => e.OrganisateurId == organisateurId)
+                .OrderByDescending(e => e.DateDebut)
+                .ToListAsync();
+        }
+
     }
 }
