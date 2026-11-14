@@ -1,11 +1,12 @@
-﻿using System.Buffers.Text;
-using System.Security.Cryptography;
-using Billetterie.Application.Interfaces;
+﻿using Billetterie.Application.Interfaces;
 using Billetterie.Application.ResultsEnum;
 using Billetterie.Domain.Entities;
 using Billetterie.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using System.Buffers.Text;
+using System.Diagnostics.Eventing.Reader;
+using System.Security.Cryptography;
 
 namespace Billetterie.Infrastructure.Services
 {
@@ -168,42 +169,20 @@ namespace Billetterie.Infrastructure.Services
                 return ResultatReservation.Echec(MotifEchecEnum.ReservationNonAnnulable);
             }
 
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            var libere = await LibererAsync(reservationId, StatutPaiement.Annule);
 
-            var lignesAffectees = await _context.Reservations
-                    .Where(r => r.Id == reservationId
-                             && r.StatutPaiement == StatutPaiement.EnAttente)
-                    .ExecuteUpdateAsync(s => s.SetProperty(
-                        r => r.StatutPaiement,
-                        StatutPaiement.Annule));
-
-            if (lignesAffectees == 0)
+            if(!libere)
             {
                 return ResultatReservation.Echec(MotifEchecEnum.ReservationNonAnnulable);
             }
 
-            await _context.Billets
-                .Where(b => b.ReservationId == reservationId)
-                .ExecuteUpdateAsync(s => s.SetProperty(
-                    b => b.Statut,
-                    BilletStatut.Annule));
+            reservation.StatutPaiement = StatutPaiement.Annule;
 
-            var parType = reservation.Billets
-                .GroupBy(b => b.TypeBilletId)
-                .Select(g => new { TypeBilletId = g.Key, Nombre = g.Count() });
-
-            foreach(var groupe in parType)
+            foreach(var billet in reservation.Billets)
             {
-                await _context.TypeBillets  
-                    .Where(t => t.Id == groupe.TypeBilletId)
-                    .ExecuteUpdateAsync(s => s.SetProperty(
-                        t => t.QuantiteVendue,
-                        t=> t.QuantiteVendue - groupe.Nombre));
+                billet.Statut = BilletStatut.Annule;
             }
 
-            await transaction.CommitAsync();
-            reservation.StatutPaiement = StatutPaiement.Annule;
-            foreach (var b in reservation.Billets) b.Statut = BilletStatut.Annule;
             return ResultatReservation.Reussi(reservation);
         }
 
@@ -231,5 +210,43 @@ namespace Billetterie.Infrastructure.Services
 
         private static string GenererCode()
             => Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(16));
+
+        private async Task<bool> LibererAsync(Guid reservationId, StatutPaiement nouveauStatut)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            var lignesAffectees = await _context.Reservations
+                    .Where(r => r.Id == reservationId
+                             && r.StatutPaiement == StatutPaiement.EnAttente)
+                    .ExecuteUpdateAsync(s => s.SetProperty(
+                        r => r.StatutPaiement,
+                        nouveauStatut));
+
+            if (lignesAffectees == 0) return false;
+
+            await _context.Billets
+                    .Where(b => b.ReservationId == reservationId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(
+                        b => b.Statut,
+                        BilletStatut.Annule));
+
+            var parType = await _context.Billets
+                .Where(b => b.ReservationId == reservationId)
+                .GroupBy(b => b.TypeBilletId)
+                .Select(g => new { TypeBilletId = g.Key, Nombre = g.Count() })
+                .ToListAsync();
+
+            foreach (var groupe in parType)
+            {
+                await _context.TypeBillets
+                    .Where(t => t.Id == groupe.TypeBilletId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(
+                        t => t.QuantiteVendue,
+                        t => t.QuantiteVendue - groupe.Nombre));
+            }
+            await transaction.CommitAsync();
+            return true;
+        }
     }
+
 }
