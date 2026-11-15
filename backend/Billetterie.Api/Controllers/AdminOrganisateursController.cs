@@ -80,6 +80,7 @@ public class AdminOrganisateursController : ControllerBase
         {
             MotifEchecOrganisateurEnum.DemandeIntrouvable => NotFound(),
             MotifEchecOrganisateurEnum.DemandeNonEnAttente => Conflict("Cette demande a déjà été traitée."),
+            MotifEchecOrganisateurEnum.ActionSurSaPropreDemande => Forbid(),
             _ => Conflict("Opération impossible.")
         };
     }

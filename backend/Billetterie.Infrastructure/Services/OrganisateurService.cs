@@ -81,6 +81,14 @@ namespace Billetterie.Infrastructure.Services
         {
             var maintenant = _timeProvider.GetUtcNow().UtcDateTime;
 
+            var estSaPropreDemande = await _context.Organisateurs
+                .AnyAsync(o => o.Id == organisateurId && o.UtilisateurId == adminId);
+
+            if (estSaPropreDemande)
+            {
+                return ResultatOrganisateur.Echec(MotifEchecOrganisateurEnum.ActionSurSaPropreDemande);
+            }
+
             var lignesAffectees = await _context.Organisateurs
                 .Where(o => o.Id == organisateurId
                          && o.StatutValidation == StatutValidation.EnAttente)

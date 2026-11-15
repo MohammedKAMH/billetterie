@@ -5,7 +5,8 @@ namespace Billetterie.Application.ResultsEnum
     {
         DemandeDejaExistante,
         DemandeIntrouvable,
-        DemandeNonEnAttente
+        DemandeNonEnAttente,
+        ActionSurSaPropreDemande
 
     }
 }
