@@ -1,3 +1,4 @@
+using Billetterie.Application.Interfaces;
 using Billetterie.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 
@@ -6,6 +7,7 @@ namespace Billetterie.Api.Auth
     public static class Policies
     {
         public const string OrganisateurValide = "OrganisateurValide";
+        public const string Admin = "Admin";
     }
 
     public class OrganisateurValideRequirement : IAuthorizationRequirement { }

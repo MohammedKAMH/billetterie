@@ -130,22 +130,22 @@ namespace Billetterie.Api.Controllers
 
 
 
-        private IActionResult VersReponseEchec(MotifEchecEnum? motif)
+        private IActionResult VersReponseEchec(MotifEchecEnumReservation? motif)
         {
             return motif switch
             {
-                MotifEchecEnum.TypeBilletIntrouvable
-                    or MotifEchecEnum.EvenementNonPublie => NotFound(),
+                MotifEchecEnumReservation.TypeBilletIntrouvable
+                    or MotifEchecEnumReservation.EvenementNonPublie => NotFound(),
 
-                MotifEchecEnum.TypesBilletDEvenementsDifferents
-                    or MotifEchecEnum.LigneEnDouble => BadRequest("Demande invalide."),
+                MotifEchecEnumReservation.TypesBilletDEvenementsDifferents
+                    or MotifEchecEnumReservation.LigneEnDouble => BadRequest("Demande invalide."),
 
-                MotifEchecEnum.EvenementDejaCommence => Conflict("L'évènement a déjà commencé."),
-                MotifEchecEnum.StockInsuffisant => Conflict("Stock insuffisant."),
-                MotifEchecEnum.ReservationIntrouvable => NotFound(),
-                MotifEchecEnum.ReservationNonPayable
-                    or MotifEchecEnum.ReservationExpiree => Conflict("Cette réservation ne peut plus être payée."),
-                MotifEchecEnum.ReservationNonAnnulable => Conflict("Cette réservation ne peut plus être annulée."),
+                MotifEchecEnumReservation.EvenementDejaCommence => Conflict("L'évènement a déjà commencé."),
+                MotifEchecEnumReservation.StockInsuffisant => Conflict("Stock insuffisant."),
+                MotifEchecEnumReservation.ReservationIntrouvable => NotFound(),
+                MotifEchecEnumReservation.ReservationNonPayable
+                    or MotifEchecEnumReservation.ReservationExpiree => Conflict("Cette réservation ne peut plus être payée."),
+                MotifEchecEnumReservation.ReservationNonAnnulable => Conflict("Cette réservation ne peut plus être annulée."),
                 _ => StatusCode(StatusCodes.Status500InternalServerError)
             };
         }

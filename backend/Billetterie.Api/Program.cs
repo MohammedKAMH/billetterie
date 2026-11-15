@@ -40,8 +40,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.OrganisateurValide, policy => policy
         .RequireAuthenticatedUser()
-        .RequireRole("Organisateur")
         .AddRequirements(new OrganisateurValideRequirement())));
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(Policies.OrganisateurValide, policy => policy
+        .RequireAuthenticatedUser()
+        .AddRequirements(new OrganisateurValideRequirement()));
+
+    options.AddPolicy(Policies.Admin, policy => policy
+        .RequireRole("Admin"));
+});
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -55,6 +64,7 @@ builder.Services.AddScoped<IEvenementService, EvenementService>();
 builder.Services.AddScoped<ITypeBilletService, TypeBilletService>(); 
 builder.Services.AddScoped<IReservationService, ReservationService>();
 builder.Services.AddHostedService<ExpirationReservationsService>();
+builder.Services.AddScoped<IOrganisateurService, OrganisateurService>();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUtilisateurCourant, UtilisateurCourant>();

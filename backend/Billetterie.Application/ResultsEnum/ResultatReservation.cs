@@ -6,9 +6,9 @@ namespace Billetterie.Application.ResultsEnum
     {
         public bool Succes { get; }
         public Reservation? Reservation { get; }
-        public MotifEchecEnum? Motif { get; }
+        public MotifEchecEnumReservation? Motif { get; }
 
-        private ResultatReservation(bool succes, Reservation? reservation, MotifEchecEnum? motif)
+        private ResultatReservation(bool succes, Reservation? reservation, MotifEchecEnumReservation? motif)
         {
             Succes = succes;
             Reservation = reservation;
@@ -18,7 +18,7 @@ namespace Billetterie.Application.ResultsEnum
         public static ResultatReservation Reussi(Reservation reservation)
             => new(true, reservation, null);
 
-        public static ResultatReservation Echec(MotifEchecEnum motif)
+        public static ResultatReservation Echec(MotifEchecEnumReservation motif)
             => new(false, null, motif);
     }
 }

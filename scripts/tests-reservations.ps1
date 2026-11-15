@@ -261,5 +261,47 @@ Verifier "M3b le brouillon est absent de la liste publique" 0 (@((Appel Get $evt
 
 $mesB = Appel Get "$evts/mes-evenements" $tB $null
 Verifier "M4  orgab ne voit pas l'evenement de orgaa" 0 (@($mesB.Json | Where-Object { $_.id -eq $evtM }).Count)
+
+Write-Host "`n--- Demande d'organisateur ---"
+$orgDemande = "$api/organisateurs"
+
+# Email lu dans le token (pas besoin de le connaitre a l'avance)
+function Get-Email($token) {
+    $p = $token.Split('.')[1].Replace('-','+').Replace('_','/')
+    while ($p.Length % 4) { $p += '=' }
+    ([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($p)) | ConvertFrom-Json).email
+}
+
+# D0 : remise a zero du compte client pour que le test soit rejouable
+$tC = Get-Token "utilisateurdetest"
+Appel Post "$api/utilisateurs/sync" $tC $null | Out-Null
+$emailC = Get-Email $tC
+$sql = "DELETE FROM ""Organisateurs"" WHERE ""UtilisateurId"" IN (SELECT ""Id"" FROM ""Utilisateurs"" WHERE ""Email"" = '$emailC');"
+$sql | docker exec -i billetterie-db sh -c 'psql -U "$POSTGRES_USER" -d billetterie' | Out-Null
+
+Verifier "D1  demande sans token" 401 (Appel Post "$orgDemande/demande" $null $null).Code
+Verifier "D1a ma-demande sans token" 401 (Appel Get "$orgDemande/ma-demande" $null $null).Code
+Verifier "D5  ma-demande avant toute demande" 404 (Appel Get "$orgDemande/ma-demande" $tC $null).Code
+
+$d2 = Appel Post "$orgDemande/demande" $tC $null
+Verifier "D2  demande du client" 201 $d2.Code
+Verifier "D2a statut EnAttente (0)" 0 $d2.Json.statutValidation
+
+Verifier "D3  seconde demande du meme client" 409 (Appel Post "$orgDemande/demande" $tC $null).Code
+
+$d4 = Appel Get "$orgDemande/ma-demande" $tC $null
+Verifier "D4  ma-demande apres la demande" 200 $d4.Code
+Verifier "D4a statut toujours EnAttente (0)" 0 $d4.Json.statutValidation
+Verifier "D4b pas d'id d'admin expose" $null $d4.Json.valideParUtilisateurId
+
+# Un demandeur en attente n'est pas organisateur valide
+$corpsEvt = @{ titre="Interdit"; description="x"; lieu="Paris"; dateDebut=$futur
+               dateFin=([datetime]$futur).AddHours(3).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") }
+Verifier "D6  demandeur en attente ne cree pas d'evenement" 403 (Appel Post $evts $tC $corpsEvt).Code
+
+# Un organisateur deja valide
+Verifier "D7  orgaa (deja valide) redemande" 409 (Appel Post "$orgDemande/demande" $tA $null).Code
+$d8 = Appel Get "$orgDemande/ma-demande" $tA $null
+Verifier "D8  ma-demande de orgaa : statut Valide (1)" 1 $d8.Json.statutValidation
 # ================= RESULTAT =================
 Write-Host ("`nResultat : {0} OK, {1} ECHEC" -f $script:ok, $script:ko) -ForegroundColor $(if ($script:ko -eq 0) { "Green" } else { "Red" })

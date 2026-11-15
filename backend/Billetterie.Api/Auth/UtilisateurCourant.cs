@@ -4,15 +4,7 @@ using Billetterie.Domain.Entities;
 
 namespace Billetterie.Api.Auth
 {
-    public interface IUtilisateurCourant
-    {
-        Task<Utilisateur?> GetAsync();
 
-        // À n'appeler que derrière la policy OrganisateurValide.
-        Task<Guid> GetOrganisateurIdAsync();
-    }
-
-    // Charge l'utilisateur du token une seule fois par requête.
     public class UtilisateurCourant : IUtilisateurCourant
     {
         private readonly IHttpContextAccessor _httpContextAccessor;

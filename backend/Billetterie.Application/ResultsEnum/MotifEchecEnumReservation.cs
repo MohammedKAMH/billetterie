@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Billetterie.Application.ResultsEnum
 {
-    public enum MotifEchecEnum
+    public enum MotifEchecEnumReservation
     {
         TypeBilletIntrouvable,
         EvenementNonPublie,

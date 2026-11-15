@@ -30,7 +30,7 @@ namespace Billetterie.Infrastructure.Services
             var ids = lignes.Select(l => l.TypeBilletId).ToList();
             if (ids.Distinct().Count() != ids.Count)
             {
-                return ResultatReservation.Echec(MotifEchecEnum.LigneEnDouble);
+                return ResultatReservation.Echec(MotifEchecEnumReservation.LigneEnDouble);
             }
 
             var typesBillets = await _context.TypeBillets
@@ -40,23 +40,23 @@ namespace Billetterie.Infrastructure.Services
 
             if (typesBillets.Count != ids.Count)
             {
-                return ResultatReservation.Echec(MotifEchecEnum.TypeBilletIntrouvable);
+                return ResultatReservation.Echec(MotifEchecEnumReservation.TypeBilletIntrouvable);
             }
 
             if (typesBillets.Select(t => t.EvenementId).Distinct().Count() != 1)
             {
-                return ResultatReservation.Echec(MotifEchecEnum.TypesBilletDEvenementsDifferents);
+                return ResultatReservation.Echec(MotifEchecEnumReservation.TypesBilletDEvenementsDifferents);
             }
 
             var evenement = typesBillets[0].Evenement;
             if (evenement.Statut != EvenementStatut.Publie)
             {
-                return ResultatReservation.Echec(MotifEchecEnum.EvenementNonPublie);
+                return ResultatReservation.Echec(MotifEchecEnumReservation.EvenementNonPublie);
             }
 
             if (evenement.DateDebut <= maintenant)
             {
-                return ResultatReservation.Echec(MotifEchecEnum.EvenementDejaCommence);
+                return ResultatReservation.Echec(MotifEchecEnumReservation.EvenementDejaCommence);
             }
 
             var typesParId = typesBillets.ToDictionary(t => t.Id);
@@ -74,7 +74,7 @@ namespace Billetterie.Infrastructure.Services
 
                 if (lignesAffectees == 0)
                 {
-                    return ResultatReservation.Echec(MotifEchecEnum.StockInsuffisant);
+                    return ResultatReservation.Echec(MotifEchecEnumReservation.StockInsuffisant);
                 }
             }
 
@@ -123,17 +123,17 @@ namespace Billetterie.Infrastructure.Services
             
             if(reservation == null)
             {
-                return ResultatReservation.Echec(MotifEchecEnum.ReservationIntrouvable);
+                return ResultatReservation.Echec(MotifEchecEnumReservation.ReservationIntrouvable);
             }
 
             if(reservation.StatutPaiement != StatutPaiement.EnAttente)
             {
-                return ResultatReservation.Echec(MotifEchecEnum.ReservationNonPayable);
+                return ResultatReservation.Echec(MotifEchecEnumReservation.ReservationNonPayable);
             }
 
             if(reservation.DateExpiration <= maintenant)
             {
-                return ResultatReservation.Echec(MotifEchecEnum.ReservationExpiree);
+                return ResultatReservation.Echec(MotifEchecEnumReservation.ReservationExpiree);
             }
 
             var lignesAffectees = await _context.Reservations
@@ -146,7 +146,7 @@ namespace Billetterie.Infrastructure.Services
 
             if (lignesAffectees == 0)
             {
-                return ResultatReservation.Echec(MotifEchecEnum.ReservationNonPayable);
+                return ResultatReservation.Echec(MotifEchecEnumReservation.ReservationNonPayable);
             }
 
             reservation.StatutPaiement = StatutPaiement.Paye;
@@ -161,19 +161,19 @@ namespace Billetterie.Infrastructure.Services
 
             if(reservation is null)
             {
-                return ResultatReservation.Echec(MotifEchecEnum.ReservationIntrouvable);
+                return ResultatReservation.Echec(MotifEchecEnumReservation.ReservationIntrouvable);
             }
 
             if(reservation.StatutPaiement != StatutPaiement.EnAttente)
             {
-                return ResultatReservation.Echec(MotifEchecEnum.ReservationNonAnnulable);
+                return ResultatReservation.Echec(MotifEchecEnumReservation.ReservationNonAnnulable);
             }
 
             var libere = await LibererAsync(reservationId, StatutPaiement.Annule);
 
             if(!libere)
             {
-                return ResultatReservation.Echec(MotifEchecEnum.ReservationNonAnnulable);
+                return ResultatReservation.Echec(MotifEchecEnumReservation.ReservationNonAnnulable);
             }
 
             reservation.StatutPaiement = StatutPaiement.Annule;
