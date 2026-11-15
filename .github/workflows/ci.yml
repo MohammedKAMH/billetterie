@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore backend/Billetterie.slnx
+      - name: Build
+        run: dotnet build backend/Billetterie.slnx --configuration Release --no-restore
+
+  dependances:
+    name: Vulnérabilités NuGet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore backend/Billetterie.slnx
+      - name: Paquets vulnérables
+        run: |
+          dotnet list backend/Billetterie.slnx package --vulnerable --include-transitive 2>&1 | tee vulnerabilites.txt
+          if grep -q "has the following vulnerable packages" vulnerabilites.txt; then
+            echo "Paquets vulnérables détectés."
+            exit 1
+          fi
+
+  secrets:
+    name: Détection de secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  trivy:
+    name: Scan Trivy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          exit-code: "0"
