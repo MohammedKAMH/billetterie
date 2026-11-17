@@ -154,6 +154,14 @@ dotnet run --project Billetterie.Api
 
 L'API écoute sur `http://localhost:5178`, la documentation sur `http://localhost:5178/scalar`.
 
+## Lancer avec Docker
+
+```bash
+cp .env.example .env     # puis renseigner les mots de passe
+docker compose up -d --build
+```
+
+L'API est alors disponible sur `http://localhost:5178`.
 ## Tests
 
 Je teste l'API de bout en bout avec des scripts PowerShell qui obtiennent de vrais jetons Keycloak et vérifient les codes HTTP, les statuts et l'état de la base. Ils couvrent : les droits d'accès par rôle, les cas limites des réservations (stock, expiration, concurrence, transactions), le flux complet de validation d'un organisateur.
