@@ -64,3 +64,29 @@ jobs:
           severity: HIGH,CRITICAL
           # Informatif : le scan est vide tant qu'il n'y a ni Dockerfile ni lockfile NuGet.
           exit-code: "0"
+  
+  image:
+    name: Image Docker
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Build de l'image
+        run: docker build -t billetterie-api:ci backend
+
+      - name: Scan de l'image (vulnérabilités)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: billetterie-api:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Scan du Dockerfile (bonnes pratiques)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: backend
+          severity: HIGH,CRITICAL
+          exit-code: "1"
