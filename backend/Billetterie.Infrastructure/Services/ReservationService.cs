@@ -213,12 +213,14 @@ namespace Billetterie.Infrastructure.Services
             var cpt = 0;
 
             var ids = await _context.Reservations
-                .Where(r => r.StatutPaiement == StatutPaiement.EnAttente && r.DateExpiration <= maintenant)
+                .Where(r => r.StatutPaiement == StatutPaiement.EnAttente
+                         && r.DateExpiration <= maintenant)
+                .OrderBy(r => r.DateExpiration)
                 .Select(r => r.Id)
                 .Take(100)
                 .ToListAsync(ct);
 
-            foreach(var id in ids)
+            foreach (var id in ids)
             {
                 ct.ThrowIfCancellationRequested();
                 var libere = await LibererAsync(id, StatutPaiement.Expire);

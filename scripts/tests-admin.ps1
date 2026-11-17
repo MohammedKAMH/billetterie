@@ -173,8 +173,9 @@ Verifier "X2a aucune trace de validation en base" "f" ((Sql "SELECT (""ValidePar
 # Le reste du back-office fonctionne toujours pour les autres demandes
 Verifier "X3  l'admin peut toujours traiter la demande d'un autre (client : deja Valide, donc 409)" 409 (Appel Post "$adminUrl/$idDemande/valider" $tAdmin $null).Code
 
-# Nettoyage : l'admin ne garde pas de demande en attente
-Reset-Demande $emailAdmin
+# Nettoyage : le client de test redevient un simple client
+Reset-Demande $emailC
+
 Write-Host ("`nResultat : {0} OK, {1} ECHEC" -f $script:ok, $script:ko) -ForegroundColor $(if ($script:ko -eq 0) { "Green" } else { "Red" })
 Write-Host "Note : a la fin du script, utilisateurdetest est organisateur valide (il est remis a zero au prochain lancement)." -ForegroundColor DarkGray
 

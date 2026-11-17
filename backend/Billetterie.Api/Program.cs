@@ -17,6 +17,13 @@ var front = "NomPolitiqueFront";
 
 var origins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
 
+var authority = builder.Configuration["Keycloak:Authority"]
+    ?? throw new InvalidOperationException("Keycloak:Authority manquant dans la configuration.");
+
+var audience = builder.Configuration["Keycloak:Audience"]
+    ?? throw new InvalidOperationException("Keycloak:Audience manquant dans la configuration.");
+
+
 builder.Services.AddCors(options =>
 options.AddPolicy(front, policy => policy
     .WithOrigins(origins)
@@ -32,15 +39,11 @@ JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.Authority = builder.Configuration["Keycloak:Authority"];
-        options.Audience = builder.Configuration["Keycloak:Audience"];
-        options.RequireHttpsMetadata = false;
+        options.Authority = authority;
+        options.Audience = audience;
+        options.RequireHttpsMetadata = builder.Configuration.GetValue("Keycloak:RequireHttpsMetadata", true);
     });
 
-builder.Services.AddAuthorization(options =>
-    options.AddPolicy(Policies.OrganisateurValide, policy => policy
-        .RequireAuthenticatedUser()
-        .AddRequirements(new OrganisateurValideRequirement())));
 
 builder.Services.AddAuthorization(options =>
 {
@@ -51,6 +54,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy(Policies.Admin, policy => policy
         .RequireRole("Admin"));
 });
+
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

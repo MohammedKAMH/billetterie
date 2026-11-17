@@ -40,6 +40,24 @@ services:
     depends_on:
       - keycloak-db
 
+  api:
+    build: ./backend
+    container_name: billetterie-api
+    restart: "no"
+    depends_on:
+      - db
+      - keycloak
+    ports:
+      - "5178:8080"
+    environment:
+      ConnectionStrings__BilletterieDb: "Host=db;Port=5432;Database=billetterie;Username=${BILLETTERIE_DB_USER};Password=${BILLETTERIE_DB_PASSWORD}"
+      Keycloak__Authority: "http://keycloak:8080/realms/billetterie"
+      Keycloak__Audience: "billetterie-api"
+      Keycloak__RequireHttpsMetadata: "false"
+      Cors__Origins__0: "http://localhost:4200"
+        
+    
+
 volumes:
   pgdata:
   keycloak_pgdata:
